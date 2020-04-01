@@ -198,6 +198,9 @@ module Cloudtasker
         end
 
         resp
+      rescue Errno::EBADF
+        destroy
+        nil
       end
 
       #
