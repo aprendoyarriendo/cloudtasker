@@ -81,8 +81,8 @@ module Cloudtasker
 
       # Deliver task
       begin
-        Thread.current['task'].deliver
-      rescue Errno::ECONNREFUSED => e
+        Thread.current['task']&.deliver
+      rescue Errno::EBADF, Errno::ECONNREFUSED => e
         raise(e) unless Thread.current['attempts'] < 3
 
         # Retry on connection error, in case the web server is not
