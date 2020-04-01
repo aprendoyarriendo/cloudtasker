@@ -198,9 +198,6 @@ module Cloudtasker
         end
 
         resp
-      rescue Errno::EBADF
-        destroy
-        nil
       end
 
       #
@@ -233,11 +230,8 @@ module Cloudtasker
       # @return [Net::HTTP] The http_client.
       #
       def http_client
-        @http_client ||=
-          begin
-            uri = URI(http_request[:url])
-            Net::HTTP.new(uri.host, uri.port).tap { |e| e.read_timeout = 60 * 10 }
-          end
+        uri = URI(http_request[:url])
+        Net::HTTP.new(uri.host, uri.port).tap { |e| e.read_timeout = 60 * 10 }
       end
 
       #
