@@ -362,13 +362,22 @@ module Cloudtasker
       # @return [Cloudtasker::Batch::BatchProgress] The batch progress.
       #
       def progress
-        # Capture batch state
-        state = batch_state
+        ret = nil
 
-        # Sum batch progress of current batch and all sub-batches
-        state.to_h.reduce(BatchProgress.new(state)) do |memo, (child_id, child_status)|
-          memo + (self.class.find(child_id)&.progress || BatchProgress.new(child_id => child_status))
+        time = Benchmark.measure do
+          # Capture batch state
+          state = batch_state
+
+          # Sum batch progress of current batch and all sub-batches
+          ret = state.to_h.reduce(BatchProgress.new(state)) do |memo, (child_id, child_status)|
+            memo + (self.class.find(child_id)&.progress || BatchProgress.new(child_id => child_status))
+          end
         end
+        worker&.logger&.info("progress in #{time.real}s") do
+          { klass: worker.class, method: 'progress', method_duration: time.real }
+        end
+
+        ret
       end
 
       #
