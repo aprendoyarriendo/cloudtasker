@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'benchmark'
+
 module Cloudtasker
   module Batch
     # Handle batch management
@@ -228,8 +230,6 @@ module Cloudtasker
       # @param [String] job_id The batch id.
       # @param [String] status The status of the sub-batch.
       #
-      # @return [<Type>] <description>
-      #
       def update_state(batch_id, status)
         redis.with_lock(batch_state_gid) do
           state = batch_state
@@ -241,16 +241,25 @@ module Cloudtasker
       #
       # Return true if all the child workers have completed.
       #
-      # @return [<Type>] <description>
+      # @return [Boolean] Return true if the batch is complete
       #
       def complete?
-        redis.with_lock(batch_state_gid) do
-          state = redis.fetch(batch_state_gid)
-          return true unless state
+        ret = nil
 
-          # Check that all children are complete
-          state.values.all? { |e| COMPLETION_STATUSES.include?(e) }
+        time = Benchmark.measure do
+          ret = redis.with_lock(batch_state_gid) do
+            state = redis.fetch(batch_state_gid)
+            return true unless state
+
+            # Check that all children are complete
+            state.values.all? { |e| COMPLETION_STATUSES.include?(e) }
+          end
         end
+        worker&.logger&.info("complete? in #{time.real}s") do
+          { klass: worker.class, method: 'complete?', method_duration: time.real }
+        end
+
+        ret
       end
 
       #
@@ -296,7 +305,12 @@ module Cloudtasker
       #
       def on_child_complete(child_batch, status = :completed)
         # Update batch state
-        update_state(child_batch.batch_id, status)
+        time = Benchmark.measure do
+          update_state(child_batch.batch_id, status)
+        end
+        worker&.logger&.info("on_child_complete.update_state in #{time.real}s") do
+          { klass: worker.class, method: 'on_child_complete', method_duration: time.real }
+        end
 
         # Notify the worker that a direct batch child worker has completed
         case status
@@ -390,7 +404,12 @@ module Cloudtasker
       #
       def execute
         # Update parent batch state
-        parent_batch&.update_state(batch_id, :processing)
+        time = Benchmark.measure do
+          parent_batch&.update_state(batch_id, :processing)
+        end
+        worker&.logger&.info("execute.update_state in #{time.real}s") do
+          { klass: worker.class, method: 'execute', method_duration: time.real }
+        end
 
         # Perform job
         yield
