@@ -309,7 +309,7 @@ module Cloudtasker
           update_state(child_batch.batch_id, status)
         end
         worker&.logger&.info("on_child_complete.update_state in #{time.real}s") do
-          { klass: worker.class, method: 'on_child_complete', method_duration: time.real }
+          { klass: worker.class, method: 'on_child_complete.update_state', method_duration: time.real }
         end
 
         # Notify the worker that a direct batch child worker has completed
@@ -408,17 +408,32 @@ module Cloudtasker
           parent_batch&.update_state(batch_id, :processing)
         end
         worker&.logger&.info("execute.update_state in #{time.real}s") do
-          { klass: worker.class, method: 'execute', method_duration: time.real }
+          { klass: worker.class, method: 'execute.update_state', method_duration: time.real }
         end
 
         # Perform job
-        yield
+        time = Benchmark.measure do
+          yield
+        end
+        worker&.logger&.info("execute.yield in #{time.real}s") do
+          { klass: worker.class, method: 'execute.yield', method_duration: time.real }
+        end
 
         # Save batch (if child worker has been enqueued)
-        setup
+        time = Benchmark.measure do
+          setup
+        end
+        worker&.logger&.info("execute.setup in #{time.real}s") do
+          { klass: worker.class, method: 'execute.setup', method_duration: time.real }
+        end
 
         # Complete batch
-        complete(:completed)
+        time = Benchmark.measure do
+          complete(:completed)
+        end
+        worker&.logger&.info("execute.complete in #{time.real}s") do
+          { klass: worker.class, method: 'execute.complete', method_duration: time.real }
+        end
       rescue DeadWorkerError => e
         complete(:dead)
         raise(e)
